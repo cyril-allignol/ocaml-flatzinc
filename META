@@ -1,0 +1,6 @@
+name = "flatzinc"
+description = "Flatzinc parser"
+version = "0.1"
+requires = ""
+archive(byte) = "flatzinc.cma"
+archive(native) = "flatzinc.cmxa"
