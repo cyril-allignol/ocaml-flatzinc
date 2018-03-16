@@ -55,6 +55,7 @@ module Expr = struct
 end
 
 exception TypeError
+exception UnboundVariable of string
 
 module Decl = struct
 
@@ -90,32 +91,6 @@ module Decl = struct
     | Array (Some n1, t1), Array (Some n2, t2) -> n1 = n2 && subtype t1 t2
     | _, _ -> false
 
-  let rec compatible_expr = fun dtype expr ->
-    match dtype, expr with
-    | Bool, Expr.Bool _ | Float None, Expr.Float _
-      | Int None, Expr.Int _ | Set None, Expr.Set _ -> true
-    | Float (Some (f1, f2)), Expr.Float f -> f1 <= f && f <= f2
-    | Int (Some s), Expr.Int i -> mem s i
-    | Set (Some s1), Expr.Set s2 -> subset s2 s1
-    | Array (i, t), Expr.Array a ->
-       (match i with None -> true | Some n -> n = Array.length a) &&
-         Array.for_all (compatible_expr t) a
-    (* TODO: non-literal cases *)
-    | _ -> false
-
-  let parameter = fun dtype name expr ->
-    if Expr.literal expr && compatible_expr dtype expr
-    then Parameter { dtype; name; value = expr }
-    else raise TypeError
-
-  let variable = fun dtype name annotations expr ->
-    match expr with
-    | None -> Variable { dtype; name; annotations; value = None }
-    | Some e ->
-       if compatible_expr dtype e
-       then Variable { dtype; name; annotations; value = expr }
-       else raise TypeError
-
 end
 
 module Predicate = struct
@@ -123,6 +98,72 @@ module Predicate = struct
   type t = { name : string; parameters : Decl.t list }
 
 end
+
+module Env = struct
+
+  type t = { predicates : (string, Predicate.t) Hashtbl.t;
+             vars : (string, Decl.t) Hashtbl.t }
+
+  let make = fun () ->
+    { predicates = Hashtbl.create 17; vars = Hashtbl.create 17 }
+
+  let find_predicate = fun env name ->
+    try Hashtbl.find env.predicates name
+    with Not_found -> raise (UnboundVariable name)
+
+  let find_variable = fun env name ->
+    try Hashtbl.find env.vars name
+    with Not_found -> raise (UnboundVariable name)
+
+  let register_predicate = fun env pred ->
+    Hashtbl.add env.predicates pred.Predicate.name pred
+
+  let register_var = fun env var ->
+    match var with
+    | Decl.Variable { dtype; name; annotations; value } ->
+       Hashtbl.add env.vars name var
+    | Decl.Parameter { dtype; name; value } ->
+       Hashtbl.add env.vars name var
+    | Decl.PredParam _ -> failwith "Syntax.Env.register_var: unreachable"
+
+end
+
+let rec compatible_expr = fun dtype expr ->
+  let open Decl in
+  match dtype, expr with
+  | Bool, Expr.Bool _ | Float None, Expr.Float _
+    | Int None, Expr.Int _ | Set None, Expr.Set _ -> true
+  | Float (Some (f1, f2)), Expr.Float f -> f1 <= f && f <= f2
+  | Int (Some s), Expr.Int i -> mem s i
+  | Set (Some s1), Expr.Set s2 -> subset s2 s1
+  | Array (i, t), Expr.Array a ->
+     (match i with None -> true | Some n -> n = Array.length a) &&
+       Array.for_all (compatible_expr t) a
+  (* TODO: non-literal cases *)
+  | _ -> false
+
+let declare_parameter = fun env dtype name expr ->
+  let p =
+    if Expr.literal expr && compatible_expr dtype expr
+    then Decl.Parameter { dtype; name; value = expr }
+    else raise TypeError in
+  Env.register_var env p;
+  p
+
+let declare_variable = fun env dtype name annotations expr ->
+  let v = match expr with
+    | None -> Decl.Variable { dtype; name; annotations; value = None }
+    | Some e ->
+       if compatible_expr dtype e
+       then Decl.Variable { dtype; name; annotations; value = expr }
+       else raise TypeError in
+  Env.register_var env v;
+  v
+
+let declare_predicate = fun env name parameters ->
+  let pred = Predicate.{ name; parameters } in
+  Env.register_predicate env pred;
+  pred
 
 module Constraint = struct
 

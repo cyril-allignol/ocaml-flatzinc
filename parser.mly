@@ -16,6 +16,7 @@
     open Syntax
     exception InvalidArrayBounds
     exception InvalidRange
+    let env = Env.make ()
 %}
 %token VAR CONSTRAINT
 %token BOOL FLOAT INT ARRAY SET OF
@@ -40,7 +41,7 @@ model :
 pred_decl :
 | PREDICATE; name = IDENTIFIER;
   LP; parameters = separated_nonempty_list(COMMA, pred_param); RP; SEMICOLON;
-  { Predicate.{ name; parameters } }
+  { declare_predicate env name parameters }
 
 pred_param :
 | t = pred_param_type; COLON; id = pred_ann_identifier;
@@ -179,13 +180,13 @@ array_expr :
 
 param_decl :
 | t = par_type; COLON; v = var_par_id; EQ; e = par_expr; SEMICOLON;
-  { Decl.parameter t v e }
+  { declare_parameter env t v e }
 
 var_decl :
 | t = var_type; COLON; v = var_par_id; a = annotations; SEMICOLON;
-  { Decl.variable t v a None }
+  { declare_variable env t v a None }
 | t = var_type; COLON; v = var_par_id; a = annotations; EQ; e = expr; SEMICOLON;
-  { Decl.variable t v a (Some e) }
+  { declare_variable env t v a (Some e) }
 
 constraint_ :
 | CONSTRAINT; id = pred_ann_identifier;

@@ -1,17 +1,3 @@
-(* Copyright 2018 Cyril Allignol
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not
- * use this file except in compliance with the License. You may obtain a copy of
- * the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations
- * under the License. *)
-
 type set = Range of int * int | Elements of int list
 val int_for_all : (int -> bool) -> int -> int -> bool
 val subset : set -> set -> bool
@@ -32,6 +18,7 @@ module Expr :
     val literal : t -> bool
   end
 exception TypeError
+exception UnboundVariable of string
 module Decl :
   sig
     type dtype =
@@ -48,12 +35,26 @@ module Decl :
         }
       | PredParam of { dtype : pred_param; name : string; }
     val subtype : dtype -> dtype -> bool
-    val compatible_expr : dtype -> Expr.t -> bool
-    val parameter : dtype -> string -> Expr.t -> t
-    val variable : dtype -> string -> Expr.t list -> Expr.t option -> t
   end
 module Predicate :
   sig type t = { name : string; parameters : Decl.t list; } end
+module Env :
+  sig
+    type t = {
+      predicates : (string, Predicate.t) Hashtbl.t;
+      vars : (string, Decl.t) Hashtbl.t;
+    }
+    val make : unit -> t
+    val find_predicate : t -> string -> Predicate.t
+    val find_variable : t -> string -> Decl.t
+    val register_predicate : t -> Predicate.t -> unit
+    val register_var : t -> Decl.t -> unit
+  end
+val compatible_expr : Decl.dtype -> Expr.t -> bool
+val declare_parameter : Env.t -> Decl.dtype -> string -> Expr.t -> Decl.t
+val declare_variable :
+  Env.t -> Decl.dtype -> string -> Expr.t list -> Expr.t option -> Decl.t
+val declare_predicate : Env.t -> string -> Decl.t list -> Predicate.t
 module Constraint :
   sig
     type t = {
