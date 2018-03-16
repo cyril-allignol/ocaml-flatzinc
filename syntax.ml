@@ -12,26 +12,31 @@
  * License for the specific language governing permissions and limitations
  * under the License. *)
 
-type set =
-  | Range of int * int
-  | Elements of int list
+module IntSet = struct
 
-let int_for_all = fun p lb ub ->
-  let rec iter = fun i ->
-    if i > ub then true else p i && iter (i + 1) in
-  iter lb
+  type t =
+    | Range of int * int
+    | Elements of int list
 
-let subset = fun s1 s2 ->
-  match s1, s2 with
-  | Range (lb1, ub1), Range (lb2, ub2) -> lb2 <= lb1 && ub1 <= ub2
-  | Elements l1, Elements l2 -> List.for_all (fun x -> List.mem x l2) l1
-  | Elements l1, Range (lb, ub) -> List.for_all (fun x -> lb <= x && x <= ub) l1
-  | Range (lb, ub), Elements l -> int_for_all (fun x -> List.mem x l) lb ub
+  let int_for_all = fun p lb ub ->
+    let rec iter = fun i ->
+      if i > ub then true else p i && iter (i + 1) in
+    iter lb
 
-let mem = fun s i ->
-  match s with
-  | Range (i1, i2) -> i1 <= i && i <= i2
-  | Elements l -> List.mem i l
+  let subset = fun s1 s2 ->
+    match s1, s2 with
+    | Range (lb1, ub1), Range (lb2, ub2) -> lb2 <= lb1 && ub1 <= ub2
+    | Elements l1, Elements l2 -> List.for_all (fun x -> List.mem x l2) l1
+    | Elements l1, Range (lb, ub) ->
+       List.for_all (fun x -> lb <= x && x <= ub) l1
+    | Range (lb, ub), Elements l -> int_for_all (fun x -> List.mem x l) lb ub
+
+  let mem = fun s i ->
+    match s with
+    | Range (i1, i2) -> i1 <= i && i <= i2
+    | Elements l -> List.mem i l
+
+end
 
 module Expr = struct
 
@@ -39,7 +44,7 @@ module Expr = struct
     | Bool of bool
     | Float of float
     | Int of int
-    | Set of set
+    | Set of IntSet.t
     | Var of string
     | Elt of string * int
     | Array of t array
@@ -62,8 +67,8 @@ module Decl = struct
   type dtype =
     | Bool
     | Float of (float * float) option
-    | Int of set option
-    | Set of set option
+    | Int of IntSet.t option
+    | Set of IntSet.t option
     | Array of int option * dtype
 
   type pred_param =
@@ -84,9 +89,9 @@ module Decl = struct
     | Float (Some (lb1, ub1)), Float (Some (lb2, ub2)) ->
        lb2 <= lb1 && ub1 <= ub2
     | Int _, Int None -> true
-    | Int (Some s1), Int (Some s2) -> subset s1 s2
+    | Int (Some s1), Int (Some s2) -> IntSet.subset s1 s2
     | Set _, Set None -> true
-    | Set (Some s1), Set (Some s2) -> subset s1 s2
+    | Set (Some s1), Set (Some s2) -> IntSet.subset s1 s2
     | Array (_, t1), Array (None, t2) -> subtype t1 t2
     | Array (Some n1, t1), Array (Some n2, t2) -> n1 = n2 && subtype t1 t2
     | _, _ -> false
@@ -134,8 +139,8 @@ let rec compatible_expr = fun dtype expr ->
   | Bool, Expr.Bool _ | Float None, Expr.Float _
     | Int None, Expr.Int _ | Set None, Expr.Set _ -> true
   | Float (Some (f1, f2)), Expr.Float f -> f1 <= f && f <= f2
-  | Int (Some s), Expr.Int i -> mem s i
-  | Set (Some s1), Expr.Set s2 -> subset s2 s1
+  | Int (Some s), Expr.Int i -> IntSet.mem s i
+  | Set (Some s1), Expr.Set s2 -> IntSet.subset s2 s1
   | Array (i, t), Expr.Array a ->
      (match i with None -> true | Some n -> n = Array.length a) &&
        Array.for_all (compatible_expr t) a
