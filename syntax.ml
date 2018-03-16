@@ -61,6 +61,7 @@ end
 
 exception TypeError
 exception UnboundVariable of string
+exception IndexOutOfBounds
 
 module Decl = struct
 
@@ -82,6 +83,12 @@ module Decl = struct
                     value : Expr.t option }
     | PredParam of { dtype : pred_param; name : string }
 
+  let get_dtype = function
+    | Parameter { dtype } -> dtype
+    | Variable { dtype } -> dtype
+    | PredParam { dtype = Param dtype } -> dtype
+    | PredParam { dtype = Var dtype } -> dtype
+
   let rec subtype = fun t1 t2 ->
     match t1, t2 with
     | Bool, Bool -> true
@@ -95,6 +102,14 @@ module Decl = struct
     | Array (_, t1), Array (None, t2) -> subtype t1 t2
     | Array (Some n1, t1), Array (Some n2, t2) -> n1 = n2 && subtype t1 t2
     | _, _ -> false
+
+  let applicable = fun d1 d2 ->
+    match d1, d2 with
+    | Variable _, PredParam { dtype = Param _ } -> false
+    | Variable { dtype = t1 }, PredParam { dtype = Var t2 } -> subtype t1 t2
+    | Parameter { dtype = t1 }, PredParam { dtype = Var t2 } -> subtype t1 t2
+    | Parameter { dtype = t1 }, PredParam { dtype = Param t2 } -> subtype t1 t2
+    | _ -> failwith "Syntax.Decl.applicable: unreachable"
 
 end
 
@@ -175,6 +190,39 @@ module Constraint = struct
   type t = { name : string;
              args : Expr.t list;
              annotations : Expr.t list }
+
+  let set = fun env name args annotations ->
+    let pred = Env.find_predicate env name in
+    if List.for_all2 (fun predparam arg ->
+           match predparam with
+           | Decl.Parameter _ | Decl.Variable _ ->
+              failwith "Syntax.Constraint.set: unreachable"
+           | Decl.PredParam { dtype } ->
+              let t1 = Decl.get_dtype predparam in
+              match arg with
+              | Expr.Bool _ | Expr.Float _ | Expr.Int _ | Expr.Set _
+                | Expr.Array _ -> compatible_expr t1 arg
+              | Expr.Annot _ | Expr.Pred _ | Expr.String _ -> false
+              | Expr.Var v ->
+                 let dv = Env.find_variable env v in
+                 Decl.applicable dv predparam
+              | Expr.Elt (a, i) ->
+                 let da = Env.find_variable env a in
+                 let elt_type =
+                   match da with
+                   | Decl.Variable { dtype = Decl.Array (Some n, t2) } ->
+                      if i <= n then Decl.Var t2 else raise IndexOutOfBounds
+                   | Decl.Parameter { dtype = Decl.Array (Some n, t2) } ->
+                      if i <= n then Decl.Param t2 else raise IndexOutOfBounds
+                   | _ -> raise TypeError in
+                 match dtype, elt_type with
+                 | Decl.Var t1, Decl.Var t2
+                   | Decl.Var t1, Decl.Param t2
+                   | Decl.Param t1, Decl.Param t2 -> Decl.subtype t2 t1
+                 | Decl.Param _, Decl.Var _ -> false
+         ) pred.Predicate.parameters args then
+      { name; args; annotations }
+    else raise TypeError
 
 end
 

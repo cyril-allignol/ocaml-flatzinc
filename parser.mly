@@ -70,30 +70,32 @@ par_pred_param_type :
 | f1 = FLOAT_LIT; DOUBLEDOT; f2 = FLOAT_LIT;
   { if f1 <= f2 then Decl.Float (Some (f1, f2)) else raise InvalidRange }
 | i1 = INT_LIT; DOUBLEDOT; i2 = INT_LIT;
-  { if i1 <= i2 then Decl.Int (Some (Range (i1, i2))) else raise InvalidRange }
+  { if i1 <= i2 then Decl.Int (Some (IntSet.Range (i1, i2)))
+    else raise InvalidRange }
 | LCB; l = separated_nonempty_list(COMMA, INT_LIT); RCB;
-  { Decl.Int (Some (Elements l)) }
+  { Decl.Int (Some (IntSet.Elements l)) }
 | SET OF; i1 = INT_LIT; DOUBLEDOT; i2 = INT_LIT;
-  { if i1 <= i2 then Decl.Set (Some (Range (i1, i2))) else raise InvalidRange }
+  { if i1 <= i2 then Decl.Set (Some (IntSet.Range (i1, i2)))
+    else raise InvalidRange }
 | SET OF LCB; l = separated_nonempty_list(COMMA, INT_LIT); RCB;
-  { Decl.Set (Some (Elements l)) }
+  { Decl.Set (Some (IntSet.Elements l)) }
 | ARRAY LSB; i = index_set; RSB OF;
   f1 = FLOAT_LIT; DOUBLEDOT; f2 = FLOAT_LIT;
   { if f1 <= f2 then Decl.Array (i, Decl.Float (Some (f1, f2)))
     else raise InvalidRange }
 | ARRAY LSB; i = index_set; RSB OF; i1 = INT_LIT; DOUBLEDOT; i2 = INT_LIT;
-  { if i1 <= i2 then Decl.Array (i, Decl.Int (Some (Range (i1, i2))))
+  { if i1 <= i2 then Decl.Array (i, Decl.Int (Some (IntSet.Range (i1, i2))))
     else raise InvalidRange }
 | ARRAY LSB; i = index_set; RSB OF;
   LCB; l = separated_nonempty_list(COMMA, INT_LIT); RCB;
-  { Decl.Array (i, Decl.Int (Some (Elements l))) }
+  { Decl.Array (i, Decl.Int (Some (IntSet.Elements l))) }
 | ARRAY LSB; i = index_set; RSB OF SET OF;
   i1 = INT_LIT; DOUBLEDOT; i2 = INT_LIT;
-  { if i1 <= i2 then Decl.Array (i, Decl.Set (Some (Range (i1, i2))))
+  { if i1 <= i2 then Decl.Array (i, Decl.Set (Some (IntSet.Range (i1, i2))))
     else raise InvalidRange }
 | ARRAY LSB; i = index_set; RSB OF SET OF;
   LCB; l = separated_nonempty_list(COMMA, INT_LIT); RCB;
-  { Decl.Array (i, Decl.Set (Some (Elements l))) }
+  { Decl.Array (i, Decl.Set (Some (IntSet.Elements l))) }
 
 var_type :
 | VAR BOOL { Decl.Bool }
@@ -102,14 +104,15 @@ var_type :
   { if f1 <= f2 then Decl.Float (Some (f1, f2)) else raise InvalidRange }
 | VAR INT { Decl.Int None }
 | VAR; i1 = INT_LIT; DOUBLEDOT; i2 = INT_LIT;
-  { if i1 <= i2 then Decl.Int (Some (Range (i1, i2))) else raise InvalidRange }
+  { if i1 <= i2 then Decl.Int (Some (IntSet.Range (i1, i2)))
+    else raise InvalidRange }
 | VAR LCB; l = separated_nonempty_list(COMMA, INT_LIT); RCB;
-  { Decl.Int (Some (Elements l)) }
+  { Decl.Int (Some (IntSet.Elements l)) }
 | VAR SET OF; i1 = INT_LIT; DOUBLEDOT; i2 = INT_LIT;
-  { if i1 <= i2 then Decl.Set (Some (Range (i1, i2)))
+  { if i1 <= i2 then Decl.Set (Some (IntSet.Range (i1, i2)))
     else raise InvalidRange }
 | VAR SET OF LCB; l = separated_nonempty_list(COMMA, INT_LIT); RCB;
-  { Decl.Set (Some (Elements l)) }
+  { Decl.Set (Some (IntSet.Elements l)) }
 | ARRAY LSB; i = index_set; RSB OF VAR BOOL { Decl.Array (i, Decl.Bool) }
 | ARRAY LSB; i = index_set; RSB OF VAR FLOAT { Decl.Array (i, Decl.Float None) }
 | ARRAY LSB; i = index_set; RSB OF VAR;
@@ -118,18 +121,18 @@ var_type :
     else raise InvalidRange }
 | ARRAY LSB; i = index_set; RSB OF VAR INT { Decl.Array (i, Decl.Int None) }
 | ARRAY LSB; i = index_set; RSB OF VAR; i1 = INT_LIT; DOUBLEDOT; i2 = INT_LIT;
-  { if i1 <= i2 then Decl.Array (i, Decl.Int (Some (Range (i1, i2))))
+  { if i1 <= i2 then Decl.Array (i, Decl.Int (Some (IntSet.Range (i1, i2))))
     else raise InvalidRange }
 | ARRAY LSB; i = index_set; RSB OF VAR;
   LCB; l = separated_nonempty_list(COMMA, INT_LIT); RCB;
-  { Decl.Array (i, Decl.Int (Some (Elements l))) }
+  { Decl.Array (i, Decl.Int (Some (IntSet.Elements l))) }
 | ARRAY LSB; i = index_set; RSB OF VAR SET OF;
   i1 = INT_LIT; DOUBLEDOT; i2 = INT_LIT;
-  { if i1 <= i2 then Decl.Array (i, Decl.Set (Some (Range (i1, i2))))
+  { if i1 <= i2 then Decl.Array (i, Decl.Set (Some (IntSet.Range (i1, i2))))
     else raise InvalidRange}
 | ARRAY LSB; i = index_set; RSB OF VAR SET OF;
   LCB; l = separated_nonempty_list(COMMA, INT_LIT); RCB;
-  { Decl.Array (i, Decl.Set (Some (Elements l))) }
+  { Decl.Array (i, Decl.Set (Some (IntSet.Elements l))) }
 
 var_pred_param_type :
 | t = var_type { t }
@@ -172,8 +175,8 @@ var_par_id :
 
 set_const :
 | i1 = INT_LIT; DOUBLEDOT; i2 = INT_LIT;
-  { if i1 <= i2 then Range (i1, i2) else raise InvalidRange }
-| LCB; l = separated_list(COMMA, INT_LIT); RCB { Elements l }
+  { if i1 <= i2 then IntSet.Range (i1, i2) else raise InvalidRange }
+| LCB; l = separated_list(COMMA, INT_LIT); RCB { IntSet.Elements l }
 
 array_expr :
 | LSB; l = separated_list(COMMA, expr); RSB { Array.of_list l }
@@ -191,7 +194,7 @@ var_decl :
 constraint_ :
 | CONSTRAINT; id = pred_ann_identifier;
   LP; l = separated_nonempty_list(COMMA, expr); RP; a = annotations; SEMICOLON;
-  { Constraint.{ name = id; args = l; annotations = a } }
+  { Constraint.set env id l a }
 
 solve_goal :
 | SOLVE; a = annotations; SATISFY SEMICOLON;

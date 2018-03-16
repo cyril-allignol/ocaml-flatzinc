@@ -1,14 +1,17 @@
-type set = Range of int * int | Elements of int list
-val int_for_all : (int -> bool) -> int -> int -> bool
-val subset : set -> set -> bool
-val mem : set -> int -> bool
+module IntSet :
+  sig
+    type t = Range of int * int | Elements of int list
+    val int_for_all : (int -> bool) -> int -> int -> bool
+    val subset : t -> t -> bool
+    val mem : t -> int -> bool
+  end
 module Expr :
   sig
     type t =
         Bool of bool
       | Float of float
       | Int of int
-      | Set of set
+      | Set of IntSet.t
       | Var of string
       | Elt of string * int
       | Array of t array
@@ -19,13 +22,14 @@ module Expr :
   end
 exception TypeError
 exception UnboundVariable of string
+exception IndexOutOfBounds
 module Decl :
   sig
     type dtype =
         Bool
       | Float of (float * float) option
-      | Int of set option
-      | Set of set option
+      | Int of IntSet.t option
+      | Set of IntSet.t option
       | Array of int option * dtype
     type pred_param = Param of dtype | Var of dtype
     type t =
@@ -34,7 +38,9 @@ module Decl :
           annotations : Expr.t list; value : Expr.t option;
         }
       | PredParam of { dtype : pred_param; name : string; }
+    val get_dtype : t -> dtype
     val subtype : dtype -> dtype -> bool
+    val applicable : t -> t -> bool
   end
 module Predicate :
   sig type t = { name : string; parameters : Decl.t list; } end
@@ -62,6 +68,7 @@ module Constraint :
       args : Expr.t list;
       annotations : Expr.t list;
     }
+    val set : Env.t -> string -> Expr.t list -> Expr.t list -> t
   end
 module Goal :
   sig
