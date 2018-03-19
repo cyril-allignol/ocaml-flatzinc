@@ -148,7 +148,7 @@ module Env = struct
 
 end
 
-let rec compatible_expr = fun dtype expr ->
+let rec compatible_expr = fun env dtype expr ->
   let open Decl in
   match dtype, expr with
   | Bool, Expr.Bool _ | Float None, Expr.Float _
@@ -157,14 +157,19 @@ let rec compatible_expr = fun dtype expr ->
   | Int (Some s), Expr.Int i -> IntSet.mem s i
   | Set (Some s1), Expr.Set s2 -> IntSet.subset s2 s1
   | Array (i, t), Expr.Array a ->
-     (match i with None -> true | Some n -> n = Array.length a) &&
-       Array.for_all (compatible_expr t) a
-  (* TODO: non-literal cases *)
+     (match i with None -> true | Some n -> n = Array.length a)
+     && Array.for_all (compatible_expr env t) a
+  | _, Expr.Var v ->
+     Decl.subtype (Decl.get_dtype (Env.find_variable env v)) dtype
+  | _, Expr.Elt (a, i) ->
+     begin match Decl.get_dtype (Env.find_variable env a) with
+     | Array (Some n, atype) -> 1 <= i && i <= n && Decl.subtype atype dtype
+     | _ -> false end
   | _ -> false
 
 let declare_parameter = fun env dtype name expr ->
   let p =
-    if Expr.literal expr && compatible_expr dtype expr
+    if Expr.literal expr && compatible_expr env dtype expr
     then Decl.Parameter { dtype; name; value = expr }
     else raise TypeError in
   Env.register_var env p;
@@ -174,7 +179,7 @@ let declare_variable = fun env dtype name annotations expr ->
   let v = match expr with
     | None -> Decl.Variable { dtype; name; annotations; value = None }
     | Some e ->
-       if compatible_expr dtype e
+       if compatible_expr env dtype e
        then Decl.Variable { dtype; name; annotations; value = expr }
        else raise TypeError in
   Env.register_var env v;
@@ -201,7 +206,7 @@ module Constraint = struct
               let t1 = Decl.get_dtype predparam in
               match arg with
               | Expr.Bool _ | Expr.Float _ | Expr.Int _ | Expr.Set _
-                | Expr.Array _ -> compatible_expr t1 arg
+                | Expr.Array _ -> compatible_expr env t1 arg
               | Expr.Annot _ | Expr.Pred _ | Expr.String _ -> false
               | Expr.Var v ->
                  let dv = Env.find_variable env v in
@@ -214,7 +219,7 @@ module Constraint = struct
                       if i <= n then Decl.Var t2 else raise IndexOutOfBounds
                    | Decl.Parameter { dtype = Decl.Array (Some n, t2) } ->
                       if i <= n then Decl.Param t2 else raise IndexOutOfBounds
-                   | _ -> raise TypeError in
+                   | _ -> failwith "Syntax.Constraint.set: unreachable (2)" in
                  match dtype, elt_type with
                  | Decl.Var t1, Decl.Var t2
                    | Decl.Var t1, Decl.Param t2
